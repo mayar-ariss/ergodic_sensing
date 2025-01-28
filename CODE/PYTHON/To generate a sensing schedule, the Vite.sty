@@ -1,0 +1,59 @@
+To generate a sensing schedule, the Viterbi-based algorithm makes decisions at each time instant \( t_G^i \): whether to trigger the sensors or not, based on a reward metric. The possible sequential decisions form a path of decision nodes of sensing or non-sensing nodes, linked by edges arriving at the final node at \( t_G^i = T_{l,H}^j \), where the user is most likely to transition into another context state. The utility of transition between nodes, or the sensor triggering decision, is measured by a metric called the reward function \( R() \), with each edge having its own defined metric. The Viterbi algorithm aims at finding the sensing schedule decisions that maximize the accumulated reward function over the entire schedule. Each sensing decision has an associated value and maximizes the accumulated reward results by consuming less energy and incurring less delay. 
+
+Mathematically, the Viterbi objective function aims to find the sequence of triggering decisions \( a_G^i \) that maximizes the accumulated reward function as follows:
+
+\[
+\text{argmax}_{a_G^i} \sum_{i=1}^{I_G} R \left(a_G^i, \Delta t_G^{i+1}, A_G^j, p^j(t_G^i, T_{l,h}^j)\right) 
+\]
+
+Where:
+- \( a_G^i \) represents the sensing schedule, where index \( i \) represents the sensor triggering decision at time \( t_G^i \).
+- \( I_G \) is the last decision instance before sensing becomes continuous, where \( I_G = \frac{T_{l,H}^j}{\delta_G} \).
+- \( \Delta t_G^{i+1} \) is the time elapsed since the preceding sensor "Sense" decision.
+- \( A_G^j \) is the accuracy achieved by sensor group \( G \) in detecting contextual state \( x_l^j \).
+- \( p^j(t_G^i, T_{l,h}^j) \) is the state survival probability.
+
+We propose a reward function that takes into account the energy consumption of the sensors relative to each other and the accuracy of the sensor group in recognizing context states. The reward function also accounts for accuracy, as an incorrectly recognized context state would lead to additional delays due to the time that would elapse until the state is correctly recognized. An incorrect recognition, either a false positive or a false negative, is not explicitly identified by the system, so the delays caused by incorrect detection are not precisely measured.
+
+To deal with this type of delay, the reward function prompts sensing to increase when the accuracy is low to minimize delays attributed to misclassification, and to decrease when the accuracy is high to reduce energy consumption. The function also takes into account the possible delay, based on the time period since the preceding sensor activation decision, i.e., when the sensing schedule last turned the sensor on. The state of the user is not known before triggering the sensors, so the reward function is probabilistic and depends on the likelihood of having transitioned into a new state, which is captured by the survival probability \( p_j(t_G^i, T_{l,h}^j) \). For \( t_G^i = T_{l,h}^j \), the survival probability reduces to near zero, i.e., \( \epsilon \), and sensing switches to continuous. 
+
+As a result, the value of the reward function depends on the combination of the decision taken and the survival probability value. The reward function is divided into two instantaneous rewards \( r() \). The first instantaneous reward represents the case where a state does not change at the new time instance, and the second instantaneous reward is when a state change occurs. Mathematically, the reward function can be derived from the expected value of the instantaneous rewards as follows:
+
+\[
+R \left(a_G^i, \Delta t_G^{i+1}, A_G^j, p^j(t_G^i, T_{l,h}^j)\right) = E_s \left[r \left(x_l^j, a_G^{i+1}, \Delta t_G^{i+1}, A_G^j\right)\right]
+\]
+
+\[
+= p^j(t_G^i, T_{l,h}^j) \cdot r \left(x_l^j, a_G^{i+1}, \Delta t_G^{i+1}, A_G^j\right) + \left(1 - p^j(t_G^i, T_{l,h}^j)\right) \cdot r \left(\bar{x}_l^j, a_G^{i+1}, \Delta t_G^{i+1}, A_G^j\right) 
+\]
+
+Where:
+- \( E_s \) is the expected reward that depends on whether the current state being recognized has changed or not, i.e., \( x_l^j \) or \( \bar{x}_l^j \), respectively.
+
+At each time instant \( t_G^i \), there is a corresponding probability \( p^j(t_G^i, T_{l,H}^j) \). To make decisions at each step on whether to trigger the sensors or not, a value is attributed to the instantaneous reward \( r() \), to calculate the best triggering decision for the next step, i.e., \( a_G^{i+1} \). To penalize long periods of inactivity of the sensors that might lead to delays, and to reward quick recognition of a state change, we measure the difference in time between the next decision and the last triggering instance as \( \Delta t_G^{i+1} \).
+
+The instantaneous reward reflects the impact of a sensing decision on consumed energy and delay in detecting a state change. The energy reward component is computed as follows:
+
+\[
+- \frac{E_G^j}{E_{G,\text{max}}}
+\]
+
+Where \( E_G \) is the energy cost of triggering sensor group \( G \), and it is normalized by the maximum instantaneous energy value \( E_{G,\text{max}} \) of the available sensor groups to recognize the requested context. 
+
+The delay component is reflected in the combination of two terms: the probability of recognition captured by the accuracy of the model \( A_G \) and the amount of delay captured by time elapsed \( \Delta t_G^{i+1} \) since the last sensing decision as follows:
+
+\[
+-\alpha \cdot \Delta t_G^{i+1} + \beta \cdot \frac{A_G}{\Delta t_G^{i+1}}
+\]
+
+Depending on the combination of triggering decisions made ("Sense" or "Do not Sense") and user state \( x_l^j \) or \( \bar{x}_l^j \) ("No State Change" or "State Change"), the instantaneous reward is a weighted sum of the two components: (1) energy and (2) time elapsed.
+
+When the decision is to sense and the state does not change \( x_l^j \), then the instantaneous reward is represented by the energy cost penalty. However, if the state has indeed changed \( \bar{x}_l^j \), then in addition to the energy penalty, the time elapsed component is added. The time elapsed component is composed of two terms: a delay penalty weighted by \( \alpha \), and a state recognition reward weighted by \( \beta \). The delay term penalizes the instantaneous reward in proportion to the time elapsed \( \Delta t_G^{i+1} \). The state recognition term is inversely proportional to \( \Delta t_G^{i+1} \) to reward recognizing the change in state as soon as possible and is proportional to the accuracy of the sensor group \( A_G^j \) in recognizing state \( x_l^j \), to account for the chance of incorrect recognition of the context state.
+
+\( \alpha \) and \( \beta \) are weighting factors, and their combination is specified by finding the optimal Pareto solution to an optimization formulation, as applied to a single sensor group:
+
+\[
+\text{argmin}_{\alpha, \beta} \omega_l \frac{E_G^j}{E_{G,\text{max}^j}} + (1 - \omega_l) \frac{D_G^j}{D_{l,\text{max}^j}}
+\]
+
+The terms in the formulation are related to a single sensor group \( E_G^j \), rather than the union of multiple groups \( \cup_l E_G^j \). Once the optimal combination of \( \alpha \) and \( \beta \) is obtained, they are applied to the reward function to find the optimal sensing schedule for each sensor group, following the steps described in Algorithm 2, to fill the LUT with the generated sensing schedules.
